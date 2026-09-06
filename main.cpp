@@ -8,10 +8,8 @@
 #include <expected>
 #include <print>
 #include <thread>
-#include <iostream>
 
-
-
+// it is one byte size.. isn't it cool?
 struct my_mutex {
 public:
 	using internal_type = uint8_t;
@@ -28,7 +26,7 @@ public:
 		explicit lock_t() = default;
 
 		lock_t(lock_t&& that) noexcept {
-			std::swap(this->self, that.self);
+			this->self.swap(that.self);
 		};
 
 		lock_t& operator=(lock_t&& that) noexcept {
@@ -68,11 +66,13 @@ private:
 
 	[[nodiscard]]
 	uint32_t get_bitset(this const Self& self) {
+		// assuming little endian
 		return 0xffu << (reinterpret_cast<uintptr_t>(std::addressof(self._lock)) & 0b11) * 8;
 	}
 
 	[[nodiscard]]
 	uint32_t get_expected(this const Self& self) {
+		// assuming little endian
 		return 0x02u << (reinterpret_cast<uintptr_t>(std::addressof(self._lock)) & 0b11) * 8;
 	}
 
@@ -101,7 +101,11 @@ private:
 public:
 	my_mutex(SelfRef) = delete;
 	auto operator=(SelfRef) = delete;
-	~my_mutex() = default;
+	~my_mutex() {
+		if (as_atomic().load()) {
+			abort();
+		}
+	}
 
 	my_mutex() noexcept = default;
 
@@ -120,25 +124,49 @@ int main()  {
 	int x = 0;
 	using namespace std::chrono_literals;
 
+	auto _ = std::jthread([&] {
+		auto _ = std::jthread([&] {
+			std::this_thread::sleep_for(250ms);
 
-	{
-		auto t1 = std::jthread([&] {
-			auto _ = m.lock();
-			std::println(std::cerr, "0 : x = {}", x);
-			x = 1;
-			std::println(std::cerr, "1 : x = {}", x);
-			std::this_thread::sleep_for(1s);
-
+			if (auto _ = m.try_lock()) {
+				std::println("{} : x = {}", __LINE__, x);
+				x = 2;
+				std::println("{} : x = {}", __LINE__, x);
+			} else {
+				std::println("{} : locked", __LINE__, x);
+			}
 		});
 
-		auto t2 = std::jthread([&] {
-			auto _ = m.lock();
-			std::println(std::cerr, "2 : x = {}", x);
-			x = 2;
-			std::println(std::cerr, "3 : x = {}", x);
-			std::this_thread::sleep_for(1s);
-		});
-	}
+		auto _ = std::jthread([&] {
+			std::this_thread::sleep_for(400ms);
 
+			if (auto _ = m.try_lock()) {
+				std::println("{} : x = {}", __LINE__, x);
+				x = 3;
+				std::println("{} : x = {}", __LINE__, x);
+			} else {
+				std::println("{} : locked", __LINE__, x);
+			}
+		});
+
+		auto _ = std::jthread([&] {
+			std::this_thread::sleep_for(100ms);
+			if (auto _ = m.lock()) {
+				std::println("{} : x = {}", __LINE__, x);
+				x = 4;
+				std::println("{} : x = {}", __LINE__, x);
+				std::this_thread::sleep_for(100ms);
+			} else {
+				abort();
+			}
+		});
+
+		auto _ = m.lock();
+		std::println("{} : x = {}", __LINE__, x);
+		x = 1;
+		std::println("{} : x = {}", __LINE__, x);
+		std::this_thread::sleep_for(200ms);
+
+	});
 
 }
