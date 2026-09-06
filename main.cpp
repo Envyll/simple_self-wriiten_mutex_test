@@ -130,7 +130,7 @@ int main()  {
 
 			if (auto _ = m.try_lock()) {
 				std::println("{} : x = {}", __LINE__, x);
-				x = 2;
+				x = -1;
 				std::println("{} : x = {}", __LINE__, x);
 			} else {
 				std::println("{} : locked", __LINE__, x);
@@ -153,7 +153,7 @@ int main()  {
 			std::this_thread::sleep_for(100ms);
 			if (auto _ = m.lock()) {
 				std::println("{} : x = {}", __LINE__, x);
-				x = 4;
+				x = 2;
 				std::println("{} : x = {}", __LINE__, x);
 				std::this_thread::sleep_for(100ms);
 			} else {
