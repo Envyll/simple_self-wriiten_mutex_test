@@ -1,11 +1,11 @@
-#include <cstdint>
 #include <linux/futex.h>
-#include <stdatomic.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <atomic>
 #include <expected>
+
 #include <print>
 #include <thread>
 
